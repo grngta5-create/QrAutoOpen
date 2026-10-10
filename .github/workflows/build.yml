@@ -14,22 +14,106 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Create Android Project Structure
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Create Basic Android Structure
         run: |
           mkdir -p app/src/main/java/com/example/qrauto
-          mkdir -p app/src/main/res
-          echo '<manifest package="com.example.qrauto"/>' > app/src/main/AndroidManifest.xml
-
-      - name: Move MainActivity
-        run: |
+          mkdir -p app/src/main/res/values
+          
+          # Move MainActivity
           if [ -f MainActivity.kt ]; then
             mv MainActivity.kt app/src/main/java/com/example/qrauto/MainActivity.kt
           fi
 
-      - name: Create build.gradle
-        run: |
-          echo "plugins { id 'com.android.application' version '8.1.0' apply false }" > build.gradle
-          echo "android { namespace 'com.example.qrauto' compileSdk 34 defaultConfig { applicationId 'com.example.qrauto' minSdk 24 targetSdk 34 versionCd 1 versionName '1.0' } }" > app/build.gradle
+          # Create Manifest
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.example.qrauto">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="true"
+                  android:label="QrAutoOpen"
+                  android:supportsRtl="true"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
 
-      - name: Build APK Placeholder
-        run: echo "APK Structure Ready"
+          # Create build.gradle files
+          cat << 'EOF' > settings.gradle
+          include ':app'
+          EOF
+
+          cat << 'EOF' > build.gradle
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.1.1'
+                  classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/build.gradle
+          plugins {
+              id 'com.android.application'
+              id 'kotlin-android'
+          }
+
+          android {
+              namespace 'com.example.qrauto'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.example.qrauto"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.core:core-ktx:1.12.0'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+              implementation 'com.google.mlkit:barcode-scanning:17.2.0'
+          }
+          EOF
+
+      - name: Build Debug APK
+        run: gradle build
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QrAutoOpen-APK
+          path: app/build/outputs/apk/debug/*.apk
